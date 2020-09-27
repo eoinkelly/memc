@@ -8,10 +8,10 @@ Functional but super raw. I knocked this together quickly to help me debug issue
 
 ### Background
 
-* A single Ruby script. Designed to be easy to copy & paste onto whatever server/container can reach the memcached server you care about.
-* Ruby core & standard lib only - no gems required.
+* A single Ruby script. Designed to be easy to "install" (via `curl`) onto whatever server/container can reach the memcached server you care about.
+* Uses Ruby core & standard library only - no gems required!
 * Runs under Ruby 2.0.0 or later so should run on old Linux distros
-* Designed to play nicely with other unix tools e.g. `memc` does not implement filtering because `grep`/`sed`/`awk` already provide more features there than I care to implement.
+* Designed to lean on and play nicely with other unix tools e.g. `memc` does not implement filtering because `grep`/`sed`/`awk` already provide more features there than I care to implement.
 * MIT licensed
 
 ### Installation
@@ -28,16 +28,36 @@ $ ./memc
 ```bash
 memc SERVER_URL help        # show help
 memc SERVER_URL ls          # list all keys
+memc SERVER_URL ls-l        # list all keys and their sizes (in bytes)
 memc SERVER_URL get KEYNAME # get the value associated with KEYNAME
 memc SERVER_URL stats       # show human readable stats
-memc SERVER_URL all-stats   # show all stats
+memc SERVER_URL all-stats   # show all stats (raw format)
 ```
 
 ### Examples
 
 ```bash
+# See human readable stats about the server
 $ memc localhost:11211 stats
+
+# See a list of all keys on the server
 $ memc localhost:11211 ls
-$ memc localhost:11211 ls | grep "interesting-thing"
+
+# Find all keys which contain 'aaa' and do not contain 'bbb'
+$ memc localhost:11211 ls | grep "aaa" | grep -v "bbb"
+
+# List key names and their size in bytes (separated by whitespace)
+$ memc localhost:11211 ls-l
+
+# show 10 largest keys
+$ memc localhost:11211 ls-l | sort -n -k 2,2 | tail
+
+# show 10 smallest keys
+$ memc localhost:11211 ls-l | sort -n -k 2,2 | head
+
+# Get the value associated with a key
 $ memc localhost:11211 get some-key-name
+
+# Save the value associated with a key into the 'output.txt' file
+$ memc localhost:11211 get some-key-name > output.txt
 ```
