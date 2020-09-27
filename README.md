@@ -2,6 +2,10 @@
 
 A memcached CLI for developers trying to debug caching issues.
 
+### Status
+
+Functional but super raw. I knocked this together quickly to help me debug issues on a project. YMMV
+
 ### Background
 
 * A single Ruby script. Designed to be easy to copy & paste onto whatever server/container can reach the memcached server you care about.
