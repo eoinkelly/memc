@@ -1,7 +1,5 @@
 #!/usr/bin/env ruby
 
-require "socket"
-
 # vi: ft=ruby
 
 CMD_HELP = "help"
@@ -9,6 +7,14 @@ CMD_LIST_KEYS = "ls"
 CMD_GET_VALUE = "get"
 CMD_SHOW_STATS = "stats"
 CMD_SHOW_ALL_STATS = "all-stats"
+MINIMUM_RUBY_VERSION = "2.0.0"
+
+if Gem::Version.new(RUBY_VERSION) < Gem::Version.new(MINIMUM_RUBY_VERSION)
+  STDERR.puts "memc requires Ruby #{MINIMUM_RUBY_VERSION} or later. You have #{RUBY_VERSION} installed."
+end
+
+require "socket"
+
 
 class Main
   def self.help
@@ -106,7 +112,10 @@ class MemcacheClient
     formatters["limit_maxbytes"] = ->(raw) { "#{(Float(raw) / 1024 / 1024).round(2)} MB" }
     formatters["bytes"] = ->(raw) { "#{(Float(raw) / 1024 / 1024).round(4)} MB" }
 
-    formatted_stats = stats.map { |k, v| [k, formatters[k].call(v)] }.to_h
+    formatted_stats = stats.reduce({}) do |memo, (k, v)| 
+      memo[k] = formatters[k].call(v)
+      memo 
+    end
 
     <<-EO_STATS
 Memcached Server 

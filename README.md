@@ -9,7 +9,8 @@ Functional but super raw. I knocked this together quickly to help me debug issue
 ### Background
 
 * A single Ruby script. Designed to be easy to copy & paste onto whatever server/container can reach the memcached server you care about.
-* Ruby core & standard lib only - no gems required. If you have any reasonably modern version of Ruby (2.3+) you can run `memc`
+* Ruby core & standard lib only - no gems required.
+* Runs under Ruby 2.0.0 or later so should run on old Linux distros
 * Designed to play nicely with other unix tools e.g. `memc` does not implement filtering because `grep`/`sed`/`awk` already provide more features there than I care to implement.
 * MIT licensed
 
