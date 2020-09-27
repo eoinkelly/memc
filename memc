@@ -61,7 +61,6 @@ Examples:
     when CMD_GET_VALUE
       key_name = ARGV.shift
       puts client.get_value(key_name)
-      puts client.meta_debug(key_name)
     when CMD_SHOW_STATS
       puts client.get_most_interesting_stats
     when CMD_SHOW_ALL_STATS
