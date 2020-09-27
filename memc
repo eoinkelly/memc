@@ -4,6 +4,7 @@
 
 CMD_HELP = "help"
 CMD_LIST_KEYS = "ls"
+CMD_LIST_KEYS_LONG = "ls-l"
 CMD_GET_VALUE = "get"
 CMD_SHOW_STATS = "stats"
 CMD_SHOW_ALL_STATS = "all-stats"
@@ -58,6 +59,8 @@ Examples:
       puts help
     when CMD_LIST_KEYS
       puts client.list_keys
+    when CMD_LIST_KEYS_LONG
+      puts client.list_keys_long
     when CMD_GET_VALUE
       key_name = ARGV.shift
       puts client.get_value(key_name)
@@ -154,7 +157,17 @@ Detailed Usage (since last server reboot)
     stats_items_result = parse_stats_items_msg(send_msg("stats items"))
 
     stats_items_result.map do |slab_num, num_items|
-      parse_stats_cachedump_msg(send_msg("stats cachedump #{slab_num} 0"))
+      results = parse_stats_cachedump_msg(send_msg("stats cachedump #{slab_num} 0"))
+      results.keys
+    end
+  end
+
+  def list_keys_long
+    stats_items_result = parse_stats_items_msg(send_msg("stats items"))
+
+    stats_items_result.map do |slab_num, num_items|
+      results = parse_stats_cachedump_msg(send_msg("stats cachedump #{slab_num} 0"))
+      results.map { |key_name, key_size| "#{key_name} #{key_size}" }
     end
   end
 
@@ -181,11 +194,16 @@ Detailed Usage (since last server reboot)
     output
   end
 
+  # {
+  #   "keyname" => 12335, # size of key in bytes
+  #   "keyname" => 12335, # size of key in bytes
+  # }
   def parse_stats_cachedump_msg(lines)
     re = /\AITEM (.+) \[(\d+) b; (\d+) s\]\z/
-    lines.map do |line|
+    lines.reduce({}) do |memo, line|
       matches = line.match(re)
-      matches[1]
+      memo[matches[1]] = matches[2]
+      memo
     end
   end
 
