@@ -1,0 +1,199 @@
+#!/usr/bin/env ruby
+
+require "socket"
+
+# vi: ft=ruby
+
+CMD_HELP = "help"
+CMD_LIST_KEYS = "ls"
+CMD_GET_VALUE = "get"
+CMD_SHOW_STATS = "stats"
+CMD_SHOW_ALL_STATS = "all-stats"
+
+class Main
+  def self.help
+    <<~EO_HELP
+      memc: A memcached client for developers
+
+      * Friendly to humans (stats are summarised nicely)
+      * Friendly to piping its output to other unix tools (use grep/sed/awk
+        etc. to filter/transform output)
+
+      Usage:
+
+        memc SERVER_URL help        # this output
+        memc SERVER_URL ls          # list all keys
+        memc SERVER_URL get KEYNAME # get the value associated with KEYNAME
+        memc SERVER_URL stats       # show human readable stats
+        memc SERVER_URL all-stats   # show all stats
+
+      Examples:
+
+        $ memc localhost:11211 stats 
+        $ memc localhost:11211 ls 
+        $ memc localhost:11211 ls | grep "interesting-thing"
+        $ memc localhost:11211 get some-key-name
+
+    EO_HELP
+  end
+
+  def self.main 
+    if ARGV.length < 2
+      puts help 
+      return
+    end
+
+    server_url = ARGV.shift
+    cmd = ARGV.shift || CMD_HELP
+    client = MemcacheClient.new(server_url)
+
+    case cmd
+    when CMD_HELP
+      puts help
+    when CMD_LIST_KEYS
+      puts client.list_keys
+    when CMD_GET_VALUE
+      key_name = ARGV.shift
+      puts client.get_value(key_name)
+      puts client.meta_debug(key_name)
+    when CMD_SHOW_STATS
+      puts client.get_most_interesting_stats
+    when CMD_SHOW_ALL_STATS
+      puts client.get_stats
+    else
+      puts <<~EO_MSG
+        Unrecognised command: #{cmd}
+
+        #{help}
+      EO_MSG
+    end
+
+    client.close
+  end
+end
+
+##
+# https://github.com/memcached/memcached/blob/master/doc/protocol.txt
+#
+class MemcacheClient
+  EOM = "END\r\n"
+
+  def initialize(server_url)
+    server_host, server_port = server_url.split(":")
+    @socket = TCPSocket.open(server_host, Integer(server_port))
+  end
+
+  def get_value(key_name)
+    send_msg("get #{key_name}")
+  end
+
+  def get_stats
+    send_msg("stats")
+  end
+
+  def get_most_interesting_stats
+    stats = send_msg("stats").reduce(Hash.new) do |memo, s| 
+      k, v = s.split(" ")[1..2]
+      memo[k] = v
+      memo
+    end
+
+    formatters = Hash.new(->(raw) { raw }) 
+
+    formatters["uptime"] = ->(raw) { "#{Time.at(Integer(raw)).utc.strftime("%H:%M:%S")} (hh:mm:ss)" }
+    formatters["accepting_conns"] = ->(raw) { raw == "1" ? "Yes" : "No" }
+    formatters["time"] = ->(raw) { Time.at(Integer(raw)).utc.to_s }
+    formatters["limit_maxbytes"] = ->(raw) { "#{(Float(raw) / 1024 / 1024).round(2)} MB" }
+    formatters["bytes"] = ->(raw) { "#{(Float(raw) / 1024 / 1024).round(4)} MB" }
+
+    formatted_stats = stats.map { |k, v| [k, formatters[k].call(v)] }.to_h
+
+    <<~EO_STATS
+      Memcached Server 
+        Version: #{formatted_stats["version"]} 
+        Uptime: #{formatted_stats["uptime"]} 
+        Current server time: #{formatted_stats["time"]} 
+        Currently accepting connections: #{formatted_stats["accepting_conns"]} 
+      Connections
+        Currently open connections: #{formatted_stats["curr_connections"]} 
+        Max num simultaneous connections: #{formatted_stats["max_connections"]} 
+      Items
+        Current stored items: #{formatted_stats["curr_items"]} 
+        Current mem used to store items: #{formatted_stats["bytes"]} 
+        Max mem server can use for storage: #{formatted_stats["limit_maxbytes"]} 
+        Num items removed from cache to free memory for new items: #{formatted_stats["evictions"]} 
+      Errors
+        Num connections closed by lack of memory: #{formatted_stats["read_buf_oom"]} 
+      Usage (since last server reboot)
+        Read requests:  #{formatted_stats["cmd_get"]} 
+        Store requests: #{formatted_stats["cmd_set"]}
+        Flush requests: #{formatted_stats["cmd_flush"]}
+        Touch Request:  #{formatted_stats["cmd_touch"]} 
+      Detailed Usage (since last server reboot)
+        GET:   hits: #{formatted_stats["get_hits"]}, misses: #{formatted_stats["get_misses"]}, expired: #{formatted_stats["get_expired"]}, flushed: #{formatted_stats["get_flushed"]}
+        INCR:  hits: #{formatted_stats["incr_hits"]}, misses: #{formatted_stats["incr_misses"]}
+        DECR:  hits: #{formatted_stats["decr_hits"]}, misses: #{formatted_stats["decr_misses"]}
+        TOUCH: hits: #{formatted_stats["touch_hits"]}, misses: #{formatted_stats["touch_misses"]}
+        CAS:   hits: #{formatted_stats["cas_hits"]}, misses: #{formatted_stats["cas_misses"]}, badval: #{formatted_stats["cas_badval"]}
+    EO_STATS
+  end
+
+  def close
+    @socket.close
+  end
+
+  def list_keys
+    stats_items_result = parse_stats_items_msg(send_msg("stats items"))
+
+    stats_items_result.map do |slab_num, num_items|
+      parse_stats_cachedump_msg(send_msg("stats cachedump #{slab_num} 0"))
+    end
+  end
+
+  private
+
+  # { 
+  #   slab_id => num_items_in_slab, 
+  #   slab_id => num_items_in_slab, 
+  #   slab_id => num_items_in_slab, 
+  #   ...
+  # }
+  def parse_stats_items_msg(lines)
+    re = /\ASTAT items:(\d+):number (\d+)\z/
+    output = {}
+
+    lines.grep(re).each do |line|
+      matches = line.match(re)
+      slab_id = matches[1]
+      num_items = Integer(matches[2])
+
+      output[slab_id] = num_items
+    end
+
+    output
+  end
+
+  def parse_stats_cachedump_msg(lines)
+    re = /\AITEM (.+) \[(\d+) b; (\d+) s\]\z/
+    lines.map do |line|
+      matches = line.match(re)
+      matches[1]
+    end
+  end
+
+  # returns the response to the given command
+  def send_msg(msg)
+    @socket.print "#{msg}\r\n"
+
+    lines = []
+
+    while line = @socket.gets
+      break if line == EOM
+      lines << line.chop
+    end
+
+    lines
+  end
+end
+
+Main.main
