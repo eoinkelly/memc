@@ -222,4 +222,6 @@ Detailed Usage (since last server reboot)
   end
 end
 
-Main.main
+# Don't run Main.main if some other program (e.g. rspec) loaded this script.
+# Only run `Main.main` if this script was the one invoked on the command line.
+Main.main if __FILE__ == $PROGRAM_NAME
