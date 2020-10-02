@@ -36,17 +36,17 @@ Usage:
 
 Examples:
 
-  $ memc localhost:11211 stats 
-  $ memc localhost:11211 ls 
+  $ memc localhost:11211 stats
+  $ memc localhost:11211 ls
   $ memc localhost:11211 ls | grep "interesting-thing"
   $ memc localhost:11211 get some-key-name
 
     EO_HELP
   end
 
-  def self.main 
+  def self.main
     if ARGV.length < 2
-      puts help 
+      puts help
       return
     end
 
@@ -80,6 +80,55 @@ Unrecognised command: #{cmd}
   end
 end
 
+class TimeUtil
+  SECS_IN_MIN = 60
+  SECS_IN_HOUR = 60 * SECS_IN_MIN
+  SECS_IN_DAY = 24 * SECS_IN_HOUR
+
+  ##
+  # Convert a number of seconds into a human readable time duration
+  #
+  # @param [Integer|String] num_seconds
+  # @return [String] human readable description of duration
+  #
+  def self.humanize(num_seconds)
+    total = Integer(num_seconds) # raises ArgumentError if it cannot convert
+    fail ArgumentError if total <= 0 # zero or negative durations are not valid
+
+    num_days = if total >= SECS_IN_DAY
+                 total / SECS_IN_DAY
+               else
+                 0
+               end
+
+    without_days = total - (num_days * SECS_IN_DAY)
+
+    num_hours = if without_days >= SECS_IN_HOUR
+                 without_days / SECS_IN_HOUR
+               else
+                 0
+               end
+
+    without_days_and_hours = without_days - (num_hours * SECS_IN_HOUR)
+
+    num_mins = if without_days_and_hours >= SECS_IN_MIN
+                 without_days_and_hours / SECS_IN_MIN
+               else
+                 0
+               end
+
+    without_days_hours_mins = without_days_and_hours - (num_mins * SECS_IN_MIN)
+
+    output = []
+    output << "#{num_days} days" if num_days > 0
+    output << "#{num_hours} hours" if num_hours > 0
+    output << "#{num_mins} mins" if num_mins > 0
+    output << "#{without_days_hours_mins} seconds" if without_days_hours_mins > 0
+
+    output.join(", ")
+  end
+end
+
 ##
 # https://github.com/memcached/memcached/blob/master/doc/protocol.txt
 #
@@ -100,46 +149,46 @@ class MemcacheClient
   end
 
   def get_most_interesting_stats
-    stats = send_msg("stats").reduce(Hash.new) do |memo, s| 
+    stats = send_msg("stats").reduce(Hash.new) do |memo, s|
       k, v = s.split(" ")[1..2]
       memo[k] = v
       memo
     end
 
-    formatters = Hash.new(->(raw) { raw }) 
+    formatters = Hash.new(->(raw) { raw })
 
-    formatters["uptime"] = ->(raw) { "#{Time.at(Integer(raw)).utc.strftime("%H:%M:%S")} (hh:mm:ss)" }
+    formatters["uptime"] = ->(num_secs) { TimeUtil.humanize(num_secs) }
     formatters["accepting_conns"] = ->(raw) { raw == "1" ? "Yes" : "No" }
     formatters["time"] = ->(raw) { Time.at(Integer(raw)).utc.to_s }
     formatters["limit_maxbytes"] = ->(raw) { "#{(Float(raw) / 1024 / 1024).round(2)} MB" }
     formatters["bytes"] = ->(raw) { "#{(Float(raw) / 1024 / 1024).round(4)} MB" }
 
-    formatted_stats = stats.reduce({}) do |memo, (k, v)| 
+    formatted_stats = stats.reduce({}) do |memo, (k, v)|
       memo[k] = formatters[k].call(v)
-      memo 
+      memo
     end
 
     <<-EO_STATS
-Memcached Server 
-  Version: #{formatted_stats["version"]} 
-  Uptime: #{formatted_stats["uptime"]} 
-  Current server time: #{formatted_stats["time"]} 
-  Currently accepting connections: #{formatted_stats["accepting_conns"]} 
+Memcached Server
+  Version: #{formatted_stats["version"]}
+  Uptime: #{formatted_stats["uptime"]}
+  Current server time: #{formatted_stats["time"]}
+  Currently accepting connections: #{formatted_stats["accepting_conns"]}
 Connections
-  Currently open connections: #{formatted_stats["curr_connections"]} 
-  Max num simultaneous connections: #{formatted_stats["max_connections"]} 
+  Currently open connections: #{formatted_stats["curr_connections"]}
+  Max num simultaneous connections: #{formatted_stats["max_connections"]}
 Items
-  Current stored items: #{formatted_stats["curr_items"]} 
-  Current mem used to store items: #{formatted_stats["bytes"]} 
-  Max mem server can use for storage: #{formatted_stats["limit_maxbytes"]} 
-  Num items removed from cache to free memory for new items: #{formatted_stats["evictions"]} 
+  Current stored items: #{formatted_stats["curr_items"]}
+  Current mem used to store items: #{formatted_stats["bytes"]}
+  Max mem server can use for storage: #{formatted_stats["limit_maxbytes"]}
+  Num items removed from cache to free memory for new items: #{formatted_stats["evictions"]}
 Errors
-  Num connections closed by lack of memory: #{formatted_stats["read_buf_oom"]} 
+  Num connections closed by lack of memory: #{formatted_stats["read_buf_oom"]}
 Usage (since last server reboot)
-  Read requests:  #{formatted_stats["cmd_get"]} 
+  Read requests:  #{formatted_stats["cmd_get"]}
   Store requests: #{formatted_stats["cmd_set"]}
   Flush requests: #{formatted_stats["cmd_flush"]}
-  Touch Request:  #{formatted_stats["cmd_touch"]} 
+  Touch Request:  #{formatted_stats["cmd_touch"]}
 Detailed Usage (since last server reboot)
   GET:   hits: #{formatted_stats["get_hits"]}, misses: #{formatted_stats["get_misses"]}, expired: #{formatted_stats["get_expired"]}, flushed: #{formatted_stats["get_flushed"]}
   INCR:  hits: #{formatted_stats["incr_hits"]}, misses: #{formatted_stats["incr_misses"]}
@@ -173,10 +222,10 @@ Detailed Usage (since last server reboot)
 
   private
 
-  # { 
-  #   slab_id => num_items_in_slab, 
-  #   slab_id => num_items_in_slab, 
-  #   slab_id => num_items_in_slab, 
+  # {
+  #   slab_id => num_items_in_slab,
+  #   slab_id => num_items_in_slab,
+  #   slab_id => num_items_in_slab,
   #   ...
   # }
   def parse_stats_items_msg(lines)
