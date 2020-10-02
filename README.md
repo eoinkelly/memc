@@ -26,12 +26,12 @@ $ ./memc
 ### Usage
 
 ```bash
-memc SERVER_URL help        # show help
-memc SERVER_URL ls          # list all keys
-memc SERVER_URL ls-l        # list all keys and their sizes (in bytes)
-memc SERVER_URL get KEYNAME # get the value associated with KEYNAME
-memc SERVER_URL stats       # show human readable stats
-memc SERVER_URL all-stats   # show all stats (raw format)
+memc SERVER_HOST:SERVER_PORT help        # show help
+memc SERVER_HOST:SERVER_PORT ls          # list all keys
+memc SERVER_HOST:SERVER_PORT ls-l        # list all keys and their sizes (in bytes)
+memc SERVER_HOST:SERVER_PORT get KEYNAME # get the value associated with KEYNAME
+memc SERVER_HOST:SERVER_PORT stats       # show human readable stats
+memc SERVER_HOST:SERVER_PORT all-stats   # show all stats (raw format)
 ```
 
 ### Examples

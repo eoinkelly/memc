@@ -28,11 +28,11 @@ memc: A memcached client for developers
 
 Usage:
 
-  memc SERVER_URL help        # this output
-  memc SERVER_URL ls          # list all keys
-  memc SERVER_URL get KEYNAME # get the value associated with KEYNAME
-  memc SERVER_URL stats       # show human readable stats
-  memc SERVER_URL all-stats   # show all stats
+  memc SERVER_HOST:SERVER_PORT help        # this output
+  memc SERVER_HOST:SERVER_PORT ls          # list all keys
+  memc SERVER_HOST:SERVER_PORT get KEYNAME # get the value associated with KEYNAME
+  memc SERVER_HOST:SERVER_PORT stats       # show human readable stats
+  memc SERVER_HOST:SERVER_PORT all-stats   # show all stats
 
 Examples:
 
@@ -50,9 +50,9 @@ Examples:
       return
     end
 
-    server_url = argv.shift
+    server_host_and_port = argv.shift
     cmd = argv.shift || CMD_HELP
-    client = MemcacheClient.new(server_url)
+    client = MemcacheClient.new(server_host_and_port)
 
     case cmd
     when CMD_HELP
@@ -138,8 +138,8 @@ end
 class MemcacheClient
   EOM = "END\r\n"
 
-  def initialize(server_url)
-    server_host, server_port = server_url.split(":")
+  def initialize(server_host_and_port)
+    server_host, server_port = server_host_and_port.split(":")
     @socket = TCPSocket.open(server_host, Integer(server_port))
   end
 
