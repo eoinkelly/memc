@@ -2,13 +2,16 @@
 
 # vi: ft=ruby
 
+VERSION = "0.1.0"
+MINIMUM_RUBY_VERSION = "2.0.0"
+
 CMD_HELP = "help"
+CMD_VERSION = "version"
 CMD_LIST_KEYS = "ls"
 CMD_LIST_KEYS_LONG = "ls-l"
 CMD_GET_VALUE = "get"
 CMD_SHOW_STATS = "stats"
 CMD_SHOW_ALL_STATS = "all-stats"
-MINIMUM_RUBY_VERSION = "2.0.0"
 
 if Gem::Version.new(RUBY_VERSION) < Gem::Version.new(MINIMUM_RUBY_VERSION)
   STDERR.puts "memc requires Ruby #{MINIMUM_RUBY_VERSION} or later. You have #{RUBY_VERSION} installed."
@@ -16,11 +19,10 @@ end
 
 require "socket"
 
-
 class Main
   def self.help
     <<-EO_HELP
-memc: A memcached client for developers
+memc (v #{VERSION}) A memcached client for developers
 
 * Friendly to humans (stats are summarised nicely)
 * Friendly to piping its output to other unix tools (use grep/sed/awk
@@ -29,10 +31,12 @@ memc: A memcached client for developers
 Usage:
 
   memc SERVER_HOST:SERVER_PORT help        # this output
+  memc SERVER_HOST:SERVER_PORT version     # show version
   memc SERVER_HOST:SERVER_PORT ls          # list all keys
+  memc SERVER_HOST:SERVER_PORT ls-l        # list all keys and key sizes (bytes)
   memc SERVER_HOST:SERVER_PORT get KEYNAME # get the value associated with KEYNAME
   memc SERVER_HOST:SERVER_PORT stats       # show human readable stats
-  memc SERVER_HOST:SERVER_PORT all-stats   # show all stats
+  memc SERVER_HOST:SERVER_PORT all-stats   # show raw stats from memcached
 
 Examples:
 
@@ -45,8 +49,16 @@ Examples:
   end
 
   def self.main(argv: ARGV, stdout: STDOUT, stderr: STDERR)
-    if argv.length < 2
-      stdout.puts help
+    if argv.length == 1
+      cmd = argv.shift
+
+      case cmd
+      when CMD_VERSION
+        stdout.puts VERSION
+      else
+        stdout.puts help
+      end
+
       return
     end
 
@@ -57,6 +69,8 @@ Examples:
     case cmd
     when CMD_HELP
       stdout.puts help
+    when CMD_VERSION
+      stdout.puts VERSION
     when CMD_LIST_KEYS
       stdout.puts client.list_keys
     when CMD_LIST_KEYS_LONG

@@ -16,54 +16,73 @@ class NullSerializer
 end
 
 RSpec.describe "Commands" do
-  let(:dalli_options) do
-    {
-      compress: false,
-      serializer: NullSerializer
-    }
-  end
+  let(:test_stdout) { StringIO.new }
+  let(:test_stderr) { StringIO.new }
 
-  around do |example|
-    @dc = Dalli::Client.new("localhost:11211", dalli_options)
+  context "when a command can complete without a memcached server" do
+    describe "version" do
+      it "works" do
+        expected_output = VERSION.concat("\n")
+        test_argv = ["version"]
 
-    example.run
+        Main.main(argv: test_argv, stdout: test_stdout, stderr: test_stderr)
 
-    @dc.flush_all # Remove all values from memcached
-  end
+        expect(test_stdout.string).to eq(expected_output)
+      end
+    end
 
-  describe "ls" do
-    it "works" do
-      keys = ["abc", "def", "ghi"]
-      keys.each { |key| @dc.set(key, "anything") }
-      expected_output = keys.reverse.join("\n").concat("\n")
+    describe "help" do
+      it "works" do
+        test_argv = ["help"]
 
-      sleep 1 # seems to be required or test cannot reliably see the keys
+        Main.main(argv: test_argv, stdout: test_stdout, stderr: test_stderr)
 
-      test_argv = ["localhost:11211", "ls"]
-      test_stdout = StringIO.new
-      test_stderr = StringIO.new
-
-      Main.main(argv: test_argv, stdout: test_stdout, stderr: test_stderr)
-
-      expect(test_stdout.string).to eq(expected_output)
+        expect(test_stdout.string).to match(/A memcached client for developers/)
+      end
     end
   end
 
-  describe "get" do
-    let(:key) { "abc" }
-    let(:value) { "hello there\nnext line\n" }
+  context "when a command requires access to a memcached server" do
+    let(:dalli_options) do
+      { compress: false, serializer: NullSerializer }
+    end
 
-    it "works" do
-      @dc.set(key, value)
-      sleep 1 # seems to be required or test cannot reliably see the key
+    around do |example|
+      @dc = Dalli::Client.new("localhost:11211", dalli_options)
+      example.run
+      @dc.flush_all # Remove all values from memcached
+    end
 
-      test_argv = ["localhost:11211", "get", key]
-      test_stdout = StringIO.new
-      test_stderr = StringIO.new
+    describe "ls" do
+      it "works" do
+        keys = %w[abc def ghi]
+        keys.each { |key| @dc.set(key, "anything") }
+        expected_output = keys.reverse.join("\n").concat("\n")
 
-      Main.main(argv: test_argv, stdout: test_stdout, stderr: test_stderr)
+        sleep 1 # seems to be required or test cannot reliably see the keys
 
-      expect(test_stdout.string).to eq(value)
+        test_argv = ["localhost:11211", "ls"]
+
+        Main.main(argv: test_argv, stdout: test_stdout, stderr: test_stderr)
+
+        expect(test_stdout.string).to eq(expected_output)
+      end
+    end
+
+    describe "get" do
+      let(:key) { "abc" }
+      let(:value) { "hello there\nnext line\n" }
+
+      it "works" do
+        @dc.set(key, value)
+        sleep 1 # seems to be required or test cannot reliably see the key
+
+        test_argv = ["localhost:11211", "get", key]
+
+        Main.main(argv: test_argv, stdout: test_stdout, stderr: test_stderr)
+
+        expect(test_stdout.string).to eq(value)
+      end
     end
   end
 end
