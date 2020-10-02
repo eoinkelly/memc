@@ -2,6 +2,8 @@
 
 A memcached CLI for developers trying to debug caching issues.
 
+![CI](https://github.com/eoinkelly/memc/workflows/CI/badge.svg)
+
 ### Status
 
 Functional but super raw. I knocked this together quickly to help me debug issues on a project. YMMV
