@@ -9,10 +9,15 @@ require:
 Style/Documentation:
   Enabled: false
 
+# We want to support back to Ruby 2.0 so cannot use squiggly heredocs
+Layout/HeredocIndentation:
+  Enabled: false
+
 AllCops:
+  NewCops: enable
   DisplayCopNames: true
   DisplayStyleGuide: true
-  TargetRubyVersion: 2.5
+  TargetRubyVersion: 2.7
   Exclude:
     # exclude files in /vendor because some CI systems put gems in here e.g.
     # TravisCI
@@ -38,10 +43,13 @@ AllCops:
     - Rakefile
 
 Layout/LineLength:
-  Max: 120
+  Max: 130
   Exclude:
     - "config/**/*"
     - "db/**/*"
+
+RSpec/MultipleMemoizedHelpers:
+  Max: 10
 
 Metrics/ModuleLength:
   Exclude:
@@ -53,13 +61,6 @@ Metrics/BlockLength:
     - "config/routes.rb"
     - "config/**/*"
     - "lib/tasks/**/*"
-
-# We generally don't want methods longer than 15 lines, except in migrations where it's probably okay.
-Metrics/MethodLength:
-  Max: 15
-  Exclude:
-    - "db/migrate/**/*.rb"
-    - "spec/**/*"
 
 # Rubocop doesn't like methods that start with `get_` or `set_`, however sometimes this is unavoidable
 # when writing pundit policies (especially where jsonapi-resources is involved).
@@ -302,8 +303,13 @@ Layout/SpaceAroundEqualsInParameterDefault:
   EnforcedStyle: no_space
 
 Metrics/AbcSize:
-  Exclude:
-    - "spec/**/*"
+  Enabled: false
+Metrics/MethodLength:
+  Enabled: false
+Metrics/CyclomaticComplexity:
+  Enabled: false
+Metrics/PerceivedComplexity:
+  Enabled: false
 
 Metrics/ClassLength:
   Max: 200

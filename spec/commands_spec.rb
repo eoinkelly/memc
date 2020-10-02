@@ -22,7 +22,7 @@ RSpec.describe "Commands" do
   context "when a command can complete without a memcached server" do
     describe "version" do
       it "works" do
-        expected_output = VERSION.concat("\n")
+        expected_output = "#{VERSION}\n"
         test_argv = ["version"]
 
         Main.main(argv: test_argv, stdout: test_stdout, stderr: test_stderr)
@@ -46,18 +46,19 @@ RSpec.describe "Commands" do
     let(:dalli_options) do
       { compress: false, serializer: NullSerializer }
     end
+    let(:dalli_client) { Dalli::Client.new("localhost:11211", dalli_options) }
 
     around do |example|
-      @dc = Dalli::Client.new("localhost:11211", dalli_options)
+      dalli_client
       example.run
-      @dc.flush_all # Remove all values from memcached
+      dalli_client.flush_all # Remove all values from memcached
     end
 
     describe "ls" do
       it "works" do
         keys = %w[abc def ghi]
-        keys.each { |key| @dc.set(key, "anything") }
-        expected_output = keys.reverse.join("\n").concat("\n")
+        keys.each { |key| dalli_client.set(key, "anything") }
+        expected_output = "#{keys.reverse.join("\n")}\n"
 
         sleep 1 # seems to be required or test cannot reliably see the keys
 
@@ -74,7 +75,7 @@ RSpec.describe "Commands" do
       let(:value) { "hello there\nnext line\n" }
 
       it "works" do
-        @dc.set(key, value)
+        dalli_client.set(key, value)
         sleep 1 # seems to be required or test cannot reliably see the key
 
         test_argv = ["localhost:11211", "get", key]

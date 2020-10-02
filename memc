@@ -2,19 +2,19 @@
 
 # vi: ft=ruby
 
-VERSION = "0.1.0"
-MINIMUM_RUBY_VERSION = "2.0.0"
+VERSION = "0.1.0".freeze
+MINIMUM_RUBY_VERSION = "2.0.0".freeze
 
-CMD_HELP = "help"
-CMD_VERSION = "version"
-CMD_LIST_KEYS = "ls"
-CMD_LIST_KEYS_LONG = "ls-l"
-CMD_GET_VALUE = "get"
-CMD_SHOW_STATS = "stats"
-CMD_SHOW_ALL_STATS = "all-stats"
+CMD_HELP = "help".freeze
+CMD_VERSION = "version".freeze
+CMD_LIST_KEYS = "ls".freeze
+CMD_LIST_KEYS_LONG = "ls-l".freeze
+CMD_GET_VALUE = "get".freeze
+CMD_SHOW_STATS = "stats".freeze
+CMD_SHOW_ALL_STATS = "all-stats".freeze
 
 if Gem::Version.new(RUBY_VERSION) < Gem::Version.new(MINIMUM_RUBY_VERSION)
-  STDERR.puts "memc requires Ruby #{MINIMUM_RUBY_VERSION} or later. You have #{RUBY_VERSION} installed."
+  warn "memc requires Ruby #{MINIMUM_RUBY_VERSION} or later. You have #{RUBY_VERSION} installed."
 end
 
 require "socket"
@@ -22,7 +22,7 @@ require "socket"
 class Main
   def self.help
     <<-EO_HELP
-memc (v #{VERSION}) A memcached client for developers
+memc (v #{VERSION}) (using Ruby: #{RUBY_VERSION}) A memcached client for developers
 
 * Friendly to humans (stats are summarised nicely)
 * Friendly to piping its output to other unix tools (use grep/sed/awk
@@ -48,7 +48,7 @@ Examples:
     EO_HELP
   end
 
-  def self.main(argv: ARGV, stdout: STDOUT, stderr: STDERR)
+  def self.main(argv: ARGV, stdout: $stdout, stderr: $stderr)
     if argv.length == 1
       cmd = argv.shift
 
@@ -80,13 +80,13 @@ Examples:
       # use IO#print here instead of IO#puts because we want to ensure we
       # return only the value i.e. we don't want to add a trailing newline to
       # the value
-      stdout.print client.get_value(key_name).join("\n")
+      stdout.print client.value(key_name).join("\n")
     when CMD_SHOW_STATS
-      stdout.puts client.get_most_interesting_stats
+      stdout.puts client.most_interesting_stats
     when CMD_SHOW_ALL_STATS
-      stdout.puts client.get_stats
+      stdout.puts client.stats
     else
-      stdout.puts <<-EO_MSG
+      stderr.puts <<-EO_MSG
 Unrecognised command: #{cmd}
 
 #{help}
@@ -121,10 +121,10 @@ class TimeUtil
     without_days = total - (num_days * SECS_IN_DAY)
 
     num_hours = if without_days >= SECS_IN_HOUR
-                 without_days / SECS_IN_HOUR
-               else
-                 0
-               end
+                  without_days / SECS_IN_HOUR
+                else
+                  0
+                end
 
     without_days_and_hours = without_days - (num_hours * SECS_IN_HOUR)
 
@@ -150,29 +150,28 @@ end
 # https://github.com/memcached/memcached/blob/master/doc/protocol.txt
 #
 class MemcacheClient
-  EOM = "END\r\n"
+  EOM = "END\r\n".freeze
 
   def initialize(server_host_and_port)
     server_host, server_port = server_host_and_port.split(":")
     @socket = TCPSocket.open(server_host, Integer(server_port))
   end
 
-  def get_value(key_name)
+  def value(key_name)
     lines = send_msg("get #{key_name}")
 
     # discard the first line because it just contains metadata
     lines.drop(1)
   end
 
-  def get_stats
+  def stats
     send_msg("stats")
   end
 
-  def get_most_interesting_stats
-    stats = send_msg("stats").reduce(Hash.new) do |memo, s|
+  def most_interesting_stats
+    stats = send_msg("stats").each_with_object({}) do |s, memo|
       k, v = s.split(" ")[1..2]
       memo[k] = v
-      memo
     end
 
     formatters = Hash.new(->(raw) { raw })
@@ -183,9 +182,8 @@ class MemcacheClient
     formatters["limit_maxbytes"] = ->(raw) { "#{(Float(raw) / 1024 / 1024).round(2)} MB" }
     formatters["bytes"] = ->(raw) { "#{(Float(raw) / 1024 / 1024).round(4)} MB" }
 
-    formatted_stats = stats.reduce({}) do |memo, (k, v)|
+    formatted_stats = stats.each_with_object({}) do |(k, v), memo|
       memo[k] = formatters[k].call(v)
-      memo
     end
 
     <<-EO_STATS
@@ -210,7 +208,7 @@ Usage (since last server reboot)
   Flush requests: #{formatted_stats["cmd_flush"]}
   Touch Request:  #{formatted_stats["cmd_touch"]}
 Detailed Usage (since last server reboot)
-  GET:   hits: #{formatted_stats["get_hits"]}, misses: #{formatted_stats["get_misses"]}, expired: #{formatted_stats["get_expired"]}, flushed: #{formatted_stats["get_flushed"]}
+  GET:   hits: #{formatted_stats["hits"]}, misses: #{formatted_stats["misses"]}, expired: #{formatted_stats["expired"]}, flushed: #{formatted_stats["flushed"]}
   INCR:  hits: #{formatted_stats["incr_hits"]}, misses: #{formatted_stats["incr_misses"]}
   DECR:  hits: #{formatted_stats["decr_hits"]}, misses: #{formatted_stats["decr_misses"]}
   TOUCH: hits: #{formatted_stats["touch_hits"]}, misses: #{formatted_stats["touch_misses"]}
@@ -225,7 +223,7 @@ Detailed Usage (since last server reboot)
   def list_keys
     stats_items_result = parse_stats_items_msg(send_msg("stats items"))
 
-    stats_items_result.map do |slab_num, num_items|
+    stats_items_result.map do |slab_num, _num_items|
       results = parse_stats_cachedump_msg(send_msg("stats cachedump #{slab_num} 0"))
       results.keys
     end
@@ -234,7 +232,7 @@ Detailed Usage (since last server reboot)
   def list_keys_long
     stats_items_result = parse_stats_items_msg(send_msg("stats items"))
 
-    stats_items_result.map do |slab_num, num_items|
+    stats_items_result.map do |slab_num, _num_items|
       results = parse_stats_cachedump_msg(send_msg("stats cachedump #{slab_num} 0"))
       results.map { |key_name, key_size| "#{key_name} #{key_size}" }
     end
@@ -269,10 +267,9 @@ Detailed Usage (since last server reboot)
   # }
   def parse_stats_cachedump_msg(lines)
     re = /\AITEM (.+) \[(\d+) b; (\d+) s\]\z/
-    lines.reduce({}) do |memo, line|
+    lines.each_with_object({}) do |line, memo|
       matches = line.match(re)
       memo[matches[1]] = matches[2]
-      memo
     end
   end
 
@@ -282,8 +279,9 @@ Detailed Usage (since last server reboot)
 
     lines = []
 
-    while line = @socket.gets
+    while line = @socket.gets # rubocop:disable Lint/AssignmentInCondition
       break if line == EOM
+
       lines << line.chop
     end
 
