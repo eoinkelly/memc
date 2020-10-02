@@ -1,4 +1,4 @@
-# memc : A developers Memcached CLI
+# memc : A Memcached CLI for Developers
 
 A memcached CLI for developers trying to debug caching issues.
 
