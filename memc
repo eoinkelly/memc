@@ -44,32 +44,35 @@ Examples:
     EO_HELP
   end
 
-  def self.main
-    if ARGV.length < 2
-      puts help
+  def self.main(argv: ARGV, stdout: STDOUT, stderr: STDERR)
+    if argv.length < 2
+      stdout.puts help
       return
     end
 
-    server_url = ARGV.shift
-    cmd = ARGV.shift || CMD_HELP
+    server_url = argv.shift
+    cmd = argv.shift || CMD_HELP
     client = MemcacheClient.new(server_url)
 
     case cmd
     when CMD_HELP
-      puts help
+      stdout.puts help
     when CMD_LIST_KEYS
-      puts client.list_keys
+      stdout.puts client.list_keys
     when CMD_LIST_KEYS_LONG
-      puts client.list_keys_long
+      stdout.puts client.list_keys_long
     when CMD_GET_VALUE
-      key_name = ARGV.shift
-      puts client.get_value(key_name)
+      key_name = argv.shift
+      # use IO#print here instead of IO#puts because we want to ensure we
+      # return only the value i.e. we don't want to add a trailing newline to
+      # the value
+      stdout.print client.get_value(key_name).join("\n")
     when CMD_SHOW_STATS
-      puts client.get_most_interesting_stats
+      stdout.puts client.get_most_interesting_stats
     when CMD_SHOW_ALL_STATS
-      puts client.get_stats
+      stdout.puts client.get_stats
     else
-      puts <<-EO_MSG
+      stdout.puts <<-EO_MSG
 Unrecognised command: #{cmd}
 
 #{help}
@@ -271,6 +274,5 @@ Detailed Usage (since last server reboot)
   end
 end
 
-# Don't run Main.main if some other program (e.g. rspec) loaded this script.
 # Only run `Main.main` if this script was the one invoked on the command line.
 Main.main if __FILE__ == $PROGRAM_NAME
