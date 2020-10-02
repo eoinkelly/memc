@@ -147,7 +147,7 @@ class MemcacheClient
     lines = send_msg("get #{key_name}")
 
     # discard the first line because it just contains metadata
-    lines[1..]
+    lines.drop(1)
   end
 
   def get_stats
