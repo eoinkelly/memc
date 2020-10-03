@@ -1,22 +1,21 @@
-# memc : A Memcached CLI for Developers
+# memc : A minimal Memcached CLI for Scripting and Debugging
 
 A memcached CLI for developers trying to debug caching issues.
 
 ![CI](https://github.com/eoinkelly/memc/workflows/CI/badge.svg)
 
-### Status
+## Overview
 
-Functional but super raw. I knocked this together quickly to help me debug issues on a project. YMMV
-
-### Background
-
-* A single Ruby script. Designed to be easy to "install" (via `curl`) onto whatever server/container can reach the memcached server you care about.
+* A single Ruby script.
 * Uses Ruby core & standard library only - no gems required!
+* Designed to be easy to "install" (via `curl`) onto whatever server/container can reach the memcached server you care about.
 * Runs under Ruby 2.0.0 or later so should run on old Linux distros
-* Designed to lean on and play nicely with other unix tools e.g. `memc` does not implement filtering because `grep`/`sed`/`awk` already provide more features there than I care to implement.
+* Designed to lean on, and play nicely with standard unix tools e.g. `memc` does not implement filtering because `grep`/`sed`/`awk` already provide that.
 * MIT licensed
 
-### Installation
+## Installation
+
+`memc` is designed to be easy to install for "casual" use e.g. you need it in your VM/container to debug some issues but you don't want the hassle of installing it "properly". Of course, you are welcome to install it "properly" if you wish :smile:
 
 ```bash
 $ cd path/to/where/you/want/to/put/this
@@ -25,9 +24,9 @@ $ chmod u+x ./memc
 $ ./memc
 ```
 
-### Usage
+## Usage
 
-```bash
+```plain
 memc SERVER_HOST:SERVER_PORT help        # show help
 memc SERVER_HOST:SERVER_PORT ls          # list all keys
 memc SERVER_HOST:SERVER_PORT ls-l        # list all keys and their sizes (in bytes)
@@ -36,7 +35,7 @@ memc SERVER_HOST:SERVER_PORT stats       # show human readable stats
 memc SERVER_HOST:SERVER_PORT all-stats   # show all stats (raw format)
 ```
 
-### Examples
+## Examples
 
 ```bash
 # See human readable stats about the server
@@ -63,3 +62,19 @@ $ memc localhost:11211 get some-key-name
 # Save the value associated with a key into the 'output.txt' file
 $ memc localhost:11211 get some-key-name > output.txt
 ```
+
+## Alternatives
+
+Memcached has client libraries for almost every programming stack but not many clients designed for use on the command line. I was able to find the following:
+
+* [memcached-cli](https://www.npmjs.com/package/memcached-cli)
+    * Interactive use only
+    * Written in JS, install via `npm`
+    * Has more features than this script
+* [memclient](https://github.com/jorisroovers/memclient)
+    * Written in Go
+    * Install binary via `curl`/`wget`
+    * Has more features than this script
+    * As of 2020-10-03 it doesn't seem to be under active development/maintenance
+
+This script is functional and meets my needs but you may prefer to use one of those, especially if your environments don't already have Ruby installed.
