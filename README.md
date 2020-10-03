@@ -1,4 +1,4 @@
-# memc : A minimal Memcached CLI for Scripting and Debugging
+# memc : A minimal Memcached CLI for scripting and debugging
 
 A memcached CLI for developers trying to debug caching issues.
 
